@@ -9,12 +9,14 @@ import math
 import tensorboard_logger as tb_logger
 import torch
 import torch.backends.cudnn as cudnn
+import numpy as np
 from torchvision import transforms, datasets
 
 from util import TwoCropTransform, AverageMeter
 from util import adjust_learning_rate, warmup_learning_rate
 from util import set_optimizer, save_model
-from networks.efficientNet_big import SupConEfficientNet
+from torch.utils.data.sampler import SubsetRandomSampler
+from networks.resnet_big import SupConResNet
 from losses import SupConLoss
 
 try:
@@ -35,7 +37,7 @@ def parse_option():
                         help='batch_size')
     parser.add_argument('--num_workers', type=int, default=16,
                         help='num of workers to use')
-    parser.add_argument('--epochs', type=int, default=50,
+    parser.add_argument('--epochs', type=int, default=1000,
                         help='number of training epochs')
 
     # optimization
@@ -51,7 +53,7 @@ def parse_option():
                         help='momentum')
 
     # model dataset
-    parser.add_argument('--model', type=str, default='efficientnet_b0')
+    parser.add_argument('--model', type=str, default='resnet50')
     parser.add_argument('--dataset', type=str, default='cifar10',
                         choices=['cifar10', 'cifar100', 'path'], help='dataset')
     parser.add_argument('--mean', type=str, help='mean of dataset in path in form of str tuple')
@@ -155,29 +157,39 @@ def set_loader(opt):
     ])
 
     if opt.dataset == 'cifar10':
-        train_dataset = datasets.CIFAR10(root=opt.data_folder,
+        complete_dataset = datasets.CIFAR10(root=opt.data_folder,
                                          transform=TwoCropTransform(train_transform),
                                          download=True)
     elif opt.dataset == 'cifar100':
-        train_dataset = datasets.CIFAR100(root=opt.data_folder,
+        complete_dataset = datasets.CIFAR100(root=opt.data_folder,
                                           transform=TwoCropTransform(train_transform),
                                           download=True)
     elif opt.dataset == 'path':
-        train_dataset = datasets.ImageFolder(root=opt.data_folder,
+        complete_dataset = datasets.ImageFolder(root=opt.data_folder, 
                                             transform=TwoCropTransform(train_transform))
     else:
         raise ValueError(opt.dataset)
 
-    train_sampler = None
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
-        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+    num_train = len(complete_dataset)
+    indices = list(range(num_train))
+    split = int(np.floor(0.8 * num_train)) 
 
-    return train_loader
+    np.random.shuffle(indices)
+    train_indices, val_indices = indices[:split], indices[split:]
+        
+    train_sampler = SubsetRandomSampler(train_indices)
+    val_sampler = SubsetRandomSampler(val_indices)
+
+    train_loader = torch.utils.data.DataLoader(complete_dataset, batch_size=opt.batch_size, 
+                                    sampler=train_sampler, num_workers=opt.num_workers, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(complete_dataset, batch_size=opt.batch_size, 
+                                    sampler=val_sampler, num_workers=opt.num_workers, pin_memory=True)
+    return train_loader, val_loader
+
 
 
 def set_model(opt):
-    model = SupConEfficientNet(name=opt.model)
+    model = SupConResNet(name=opt.model)
     criterion = SupConLoss(temperature=opt.temp)
 
     # enable synchronized Batch Normalization
@@ -256,7 +268,7 @@ def main():
     opt = parse_option()
 
     # build data loader
-    train_loader = set_loader(opt)
+    train_loader, val_loader = set_loader(opt)
 
     # build model and criterion
     model, criterion = set_model(opt)

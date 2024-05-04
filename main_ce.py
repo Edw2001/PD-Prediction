@@ -10,7 +10,7 @@ import tensorboard_logger as tb_logger
 import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms, datasets
-
+from torch.utils.data import random_split
 from util import AverageMeter
 from util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util import set_optimizer, save_model
@@ -109,6 +109,8 @@ def parse_option():
         opt.n_cls = 10
     elif opt.dataset == 'cifar100':
         opt.n_cls = 100
+    elif opt.dataset == 'path':
+        opt.n_cls = 2
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
 
@@ -123,6 +125,10 @@ def set_loader(opt):
     elif opt.dataset == 'cifar100':
         mean = (0.5071, 0.4867, 0.4408)
         std = (0.2675, 0.2565, 0.2761)
+    elif opt.dataset == 'path':
+        print("test")
+        mean = (0.485, 0.456, 0.406)
+        std = (0.229, 0.224, 0.225) 
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
     normalize = transforms.Normalize(mean=mean, std=std)
@@ -153,6 +159,14 @@ def set_loader(opt):
         val_dataset = datasets.CIFAR100(root=opt.data_folder,
                                         train=False,
                                         transform=val_transform)
+    elif opt.dataset == 'path':
+        dataset = datasets.ImageFolder(root=opt.data_folder, transform=train_transform)
+        train_size = int(0.8 * len(dataset))
+        val_size = len(dataset) - train_size
+        train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=opt.num_workers)
+        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=opt.num_workers)
     else:
         raise ValueError(opt.dataset)
 

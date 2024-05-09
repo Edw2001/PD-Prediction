@@ -50,11 +50,7 @@ def parse_option():
     # model dataset
     parser.add_argument('--model', type=str, default='resnet50')
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        choices=['cifar10', 'cifar100', 'path'], help='dataset')
-    parser.add_argument('--data_folder', type=str, default='./datasets/', help='path to custom dataset')
-    parser.add_argument('--mean', type=str, help='mean of dataset in path in form of str tuple')
-    parser.add_argument('--std', type=str, help='std of dataset in path in form of str tuple')
-    parser.add_argument('--size', type=int, default=32, help='parameter for RandomResizedCrop')
+                        choices=['cifar10', 'cifar100',"PaHaW"], help='dataset')
 
     # other setting
     parser.add_argument('--cosine', action='store_true',
@@ -68,14 +64,7 @@ def parse_option():
     opt = parser.parse_args()
 
     # set the path according to the environment
-    if opt.dataset == 'path':
-        assert opt.data_folder is not None \
-            and opt.mean is not None \
-            and opt.std is not None
-
-    # set the path according to the environment
-    if opt.data_folder is None:
-        opt.data_folder = './datasets/'
+    opt.data_folder = './datasets/'
 
     iterations = opt.lr_decay_epochs.split(',')
     opt.lr_decay_epochs = list([])
@@ -105,7 +94,7 @@ def parse_option():
         opt.n_cls = 10
     elif opt.dataset == 'cifar100':
         opt.n_cls = 100
-    elif opt.dataset == 'path':
+    elif opt.dataset == 'PaHaW':
         opt.n_cls = 2
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
@@ -128,15 +117,15 @@ def set_model(opt):
         else:
             new_state_dict = {}
             for k, v in state_dict.items():
-                k = k.replace("module.", "")
-                new_state_dict[k] = v
+                if k in model.state_dict() and v.size() == model.state_dict()[k].size():
+                    new_state_dict[k] = v
             state_dict = new_state_dict
         model = model.cuda()
         classifier = classifier.cuda()
         criterion = criterion.cuda()
         cudnn.benchmark = True
 
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
     else:
         raise NotImplementedError('This code requires GPU')
 
@@ -172,7 +161,7 @@ def train(train_loader, model, classifier, criterion, optimizer, epoch, opt):
 
         # update metric
         losses.update(loss.item(), bsz)
-        acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+        acc1, acc5 = accuracy(output, labels, topk=(1, 2))
         top1.update(acc1[0], bsz)
 
         # SGD
@@ -220,7 +209,7 @@ def validate(val_loader, model, classifier, criterion, opt):
 
             # update metric
             losses.update(loss.item(), bsz)
-            acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+            acc1, acc5 = accuracy(output, labels, topk=(1, 2))
             top1.update(acc1[0], bsz)
 
             # measure elapsed time

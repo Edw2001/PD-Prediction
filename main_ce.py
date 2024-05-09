@@ -10,7 +10,7 @@ import tensorboard_logger as tb_logger
 import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms, datasets
-from torch.utils.data import random_split
+
 from util import AverageMeter
 from util import adjust_learning_rate, warmup_learning_rate, accuracy
 from util import set_optimizer, save_model
@@ -52,7 +52,7 @@ def parse_option():
     # model dataset
     parser.add_argument('--model', type=str, default='resnet50')
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        choices=['cifar10', 'cifar100'], help='dataset')
+                        choices=['cifar10', 'cifar100', 'PaHaW'], help='dataset')
 
     # other setting
     parser.add_argument('--cosine', action='store_true',
@@ -109,7 +109,7 @@ def parse_option():
         opt.n_cls = 10
     elif opt.dataset == 'cifar100':
         opt.n_cls = 100
-    elif opt.dataset == 'path':
+    elif opt.dataset == 'PaHaW':
         opt.n_cls = 2
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
@@ -125,22 +125,24 @@ def set_loader(opt):
     elif opt.dataset == 'cifar100':
         mean = (0.5071, 0.4867, 0.4408)
         std = (0.2675, 0.2565, 0.2761)
-    elif opt.dataset == 'path':
-        print("test")
-        mean = (0.485, 0.456, 0.406)
-        std = (0.229, 0.224, 0.225) 
+    elif opt.dataset == "PaHaW":
+        mean = (0.4914, 0.4822, 0.4465)
+        std = (0.2023, 0.1994, 0.2010)
     else:
         raise ValueError('dataset not supported: {}'.format(opt.dataset))
+    
     normalize = transforms.Normalize(mean=mean, std=std)
 
     train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=32, scale=(0.2, 1.)),
+        transforms.RandomResizedCrop(size=224, scale=(0.2, 1.)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
     ])
 
     val_transform = transforms.Compose([
+        transforms.RandomResizedCrop(size=224, scale=(0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         normalize,
     ])
@@ -159,14 +161,15 @@ def set_loader(opt):
         val_dataset = datasets.CIFAR100(root=opt.data_folder,
                                         train=False,
                                         transform=val_transform)
-    elif opt.dataset == 'path':
-        dataset = datasets.ImageFolder(root=opt.data_folder, transform=train_transform)
-        train_size = int(0.8 * len(dataset))
-        val_size = len(dataset) - train_size
-        train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    elif opt.dataset == 'PaHaW':
+        train_dataset = datasets.ImageFolder(root='./datasets/complete_data/train',
+                                          transform=train_transform,
+                                          )
+        val_dataset = datasets.ImageFolder(root="./datasets/complete_data/test",
+                                           transform = val_transform
+                                        
+                                        )
 
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=opt.num_workers)
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=opt.num_workers)
     else:
         raise ValueError(opt.dataset)
 
@@ -225,7 +228,7 @@ def train(train_loader, model, criterion, optimizer, epoch, opt):
 
         # update metric
         losses.update(loss.item(), bsz)
-        acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+        acc1, acc5 = accuracy(output, labels, topk=(1, 2))
         top1.update(acc1[0], bsz)
 
         # SGD
@@ -272,7 +275,7 @@ def validate(val_loader, model, criterion, opt):
 
             # update metric
             losses.update(loss.item(), bsz)
-            acc1, acc5 = accuracy(output, labels, topk=(1, 5))
+            acc1, acc5 = accuracy(output, labels, topk=(1, 2))
             top1.update(acc1[0], bsz)
 
             # measure elapsed time

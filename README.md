@@ -8,6 +8,8 @@
 - main_ce.py is running the network through cross-entropy
 - main_supcon.py is running the network through SupCon Loss
 - main_linear.py is loading the pre-trained model and giving the classification result.
+- evaluuation.ipynb is trying to load the model and evaluate the result.
+- baseline_not_pretrained.ipynb is the baseline model.
   
 ## command: 
 

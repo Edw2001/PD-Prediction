@@ -1,6 +1,17 @@
 # PD-Prediction
+## Files
+- The PaHaW folder is the raw data set, and the pahaw_visualization is the visualization of the spiral image. The corresponding visual code is visuualization.ipynb
+- The images after data augmentation is in data_augmentation folder. The input version is in datasets/complete_data.
+- The networks folder is defined the network we used.
+- save/SupCon stores the running result.
+- losses.py defined the supcon loss we used
+- main_ce.py is running the network through cross-entropy
+- main_supcon.py is running the network through SupCon Loss
+- main_linear.py is loading the pre-trained model and giving the classification result.
+  
+## command: 
 
-command: python main_supcon.py --batch_size 8 --cosine --num_workers 16 --size 128 --epochs 80 --model resnet50 --data_folder "datasets/complete_data" --dataset path --mean "(0.485, 0.456, 0.406)" --learning_rate 0.00001 --std "(0.229, 0.224, 0.225)" --method SupCon --momentum 0.9 --print_freq 1 --save_freq 10
+python main_supcon.py --batch_size 8 --cosine --num_workers 16 --size 128 --epochs 80 --model resnet50 --data_folder "datasets/complete_data" --dataset path --mean "(0.485, 0.456, 0.406)" --learning_rate 0.00001 --std "(0.229, 0.224, 0.225)" --method SupCon --momentum 0.9 --print_freq 1 --save_freq 10
 
 
 
